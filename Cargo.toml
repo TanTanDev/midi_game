@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 midir = "0.7.0"
-macroquad = "0.3.0-alpha.17"
+macroquad = "0.3.1"
 macroquad_tantan_toolbox = {path = "../macroquad_tantan_toolbox"}
 async-trait = "0.1.48"

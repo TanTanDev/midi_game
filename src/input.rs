@@ -21,9 +21,9 @@ pub struct InputDataRaw {
 }
 
 #[derive(Eq, Clone, Debug, Copy, PartialEq)]
-pub enum ButtonStatus {
-    Pressed,
-    Released,
+pub enum SliderLimitCheck {
+    Higher,
+    Lower,
 }
 
 impl Input {
@@ -80,16 +80,41 @@ impl Input {
         !self.is_button_pressed(id)
     }
 
+    fn convert_to_fraction(v: u8) -> f32 {
+        v as f32 / 127f32
+    }
+
     pub fn get_fraction(&self, id: u8) -> f32 {
         let mut raw_inputs = self.raw_inputs.lock().unwrap();
         let mut previous_raw_inputs = self.previous_raw_inputs.lock().unwrap();
         if let Some(raw_input) = raw_inputs.get_mut(&id) {
-            raw_input.value as f32 / 127u8 as f32
+            Self::convert_to_fraction(raw_input.value)
         } else if let Some(previous_raw_input) = previous_raw_inputs.get_mut(&id) {
-            previous_raw_input.value as f32 / 127u8 as f32
+            Self::convert_to_fraction(previous_raw_input.value)
         } else {
             0f32
         }
+    }
+
+    // let's say we want to trigger every time slider goes from under 0.5 to over 0.5
+    pub fn fraction_reached_limit(&self, id: u8, fraction: f32, limit: SliderLimitCheck) -> bool {
+        let mut raw_inputs = self.raw_inputs.lock().unwrap();
+        let mut previous_raw_inputs = self.previous_raw_inputs.lock().unwrap();
+        if let Some(raw_input) = raw_inputs.get_mut(&id) {
+            if let Some(previous_raw_input) = previous_raw_inputs.get_mut(&id) {
+                return match limit {
+                    SliderLimitCheck::Lower => {
+                        Self::convert_to_fraction(raw_input.value) <= fraction
+                            && Self::convert_to_fraction(previous_raw_input.value) > fraction
+                    }
+                    SliderLimitCheck::Higher => {
+                        Self::convert_to_fraction(raw_input.value) >= fraction
+                            && Self::convert_to_fraction(previous_raw_input.value) < fraction
+                    }
+                };
+            }
+        }
+        false
     }
 
     // clear all inputs, update previous values
@@ -117,7 +142,7 @@ impl Input {
                     &self.input_port,
                     self.device_name.as_str(),
                     move |stamp, message, _| {
-                        println!("{}: {:?} (len = {})", stamp, message, message.len());
+                        //println!("{}: {:?} (len = {})", stamp, message, message.len());
                         let mut rw = raw_inputs.lock().unwrap();
                         let identifier = message[1];
                         rw.insert(
